@@ -4,6 +4,9 @@
 # Obviously (again): Adjust ALL paths, add/remove what you need or dont, adjust ENVs, commands, etc. Dont be a total idiot and just run code you copy pasted from the web.
 # NOTE: YOU HAVE TO FIND ALL BIND MOUNT PATHS MANUALLY!!! THIS IS NOT AUTOMATED, IN CONTRAST TO VOLUMES! AND ONLY BACKUP WHAT YOU WANT, OTHERWISE YOU IDIOT WILL BACKUP YOUR WHOLE NAS WHEN YOU BIND IT TO PLEX!!
 # THIS IS THE VERSION I PERSONALLY USE, I WILL UPLOAD A TEMPLATE VERSION LATER.
+# LOG:
+# Added Pruning
+# Fixed Pruning
 # DEFINE VARIABLES:
 DATE=$(date +%Y-%m-%d)
 # SET ENVIRONMENT VARIABLES:
@@ -11,7 +14,7 @@ env ZSTD_CLEVEL=1
 # TODO - REPLACE PATHS WITH VARIABLES:
 # BACKUP_DIR_VOLUMES=/BACKUP/Volumes
 # TUI:
-echo "|----------| Script - Backup - Cosmos Cloud - Volumes & Bind Mounts with BORG to NAS-MAIN - V.0.2 - 2023 11 24 |----------|"
+echo "|----------| Script - Backup - Cosmos Cloud - Volumes & Bind Mounts with BORG to NAS-MAIN - V.0.3 - 2023 11 24 |----------|"
 # EXPORT - Paperless-Office 1:
 echo "|----------> 1.1 Step: Exports from running Containers & Backup with BORG - Paperless - Office:"
 sudo docker exec Paperless-Office document_exporter ../export -d
@@ -52,9 +55,10 @@ echo "|----------> 5. Step - Optional: Dump all Databases: Not Yet Implemented!"
 # OPTIONAL: Borg Prune:
 echo "|----------> 6. Step: Prune Borg Repos:"
 #NOTE: This will delete all but the listed number of backups. With -p=progress --force=force deletion --list=Print summary
-sudo borg -p prune --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Bind
-sudo borg -p prune --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Exports
-sudo borg -p prune --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Volumes
+# This will keep all backups in the last 24H, for every last 30 days, 4 weekly, 12 monthly and up to 100 years of yearly backups.. ;)
+sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Bind
+sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Exports
+sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Volumes
 # CODE NOT NEEDED RIGHT NOW - START ------------------------------------------------------------------------------------------------------------------:
 #echo "|----------> 3. Step: Compress all Volumes in /var/lib/docker/volumes as TAR with no compression and save to NAS-MAIN:"
 #sudo tar -cvf /BACKUP/Volumes/$DATE/var-lib-docker-volumes-$DATE.tar /var/lib/docker/volumes

@@ -14,10 +14,10 @@
 # -Added important System Paths
 # -Added /home/steven/docker bind mounts
 # -Added lines for better structure and visibility
+# -Added DB Dumping and backup with Borg
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # TODO - WIP:
-# -Dump DB - Nextcloud
-# -Dump DB - Monica
+# -NONE
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # TODO - STILL TO DO:
 # TODO - REPLACE PATHS WITH VARIABLES:
@@ -30,7 +30,7 @@ DATE=$(date +%Y-%m-%d)
 env ZSTD_CLEVEL=1
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # TUI:
-echo "|----------| Script - Backup - Cosmos Cloud - Volumes & Bind Mounts with BORG to NAS-MAIN - V.0.2 - 2023 11 24 |----------|"
+echo "|----------| Script - Backup - Cosmos Cloud - Volumes & Bind Mounts with BORG to NAS-MAIN - V.0.5 - 2023 11 25 |----------|"
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # EXPORT - Paperless-Office 1:
 echo "|----------> 1.1 Step: Exports from running Containers & Backup with BORG - Paperless - Office:"
@@ -41,19 +41,45 @@ echo "|----------> 1.2 Step: Exports from running Containers & Backup with BORG 
 sudo docker exec Paperless-Research document_exporter ../export -d
 sudo borg create --stats --progress /BORG/Cosmos/Exports::{now}-paperless-research /home/steven/paperless/export
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# OPTIONAL: DUMP DBS:
+echo "|----------> 2.1 Step: Dump all Databases:"
+# TEMPLATE COMMAND - MARIA DB: docker exec CONTAINERNAME /usr/bin/mariadb-dump -u root --password=ROOTPASSWORD DATABASE > backup.sql
+# TEMPLATE COMMAND - MYSQL: docker exec CONTAINERNAME /usr/bin/mysqldump -u root --password=ROOTPASSWORD DATABASE > backup.sql
+# TEMPLATE COMMAND - PostgreSQL - All - Uncompressed: docker exec CONTAINERNAME pg_dumpall -c -U POSTGRESUSER > backup.sql 
+# TEMPLATE COMMAND - PostgreSQL - Specific DB - Uncompressed: docker exec CONTAINERNAME pg_dumpall -c -U POSTGRESUSER -d DATABASENAME > backup.sql 
+echo "|----------> 2.1 Step - Optional: Dump all Databases - Nextcloud - Privat:"
+sudo docker exec Nextcloud-Privat-mariadb /usr/bin/mariadb-dump -u root --password=TN9J5CHJMJRBUT1FUVN85PDL nextcloud > /home/steven/backup/DB/backup-nextcloud-privat.sql
+echo "|----------> 2.1 Step - Optional: Dump all Databases - Nextcloud - Public:"
+sudo docker exec Nextcloud-Public-mariadb /usr/bin/mariadb-dump -u root --password=FW3R9YAPGJ0X4ROURB39O6CC nextcloud > /home/steven/backup/DB/backup-nextcloud-public.sql
+echo "|----------> 2.1 Step - Optional: Dump all Databases - Nextcloud - No Name:"
+sudo docker exec Nextcloud-mariadb /usr/bin/mariadb-dump -u root --password=MJ2D8RYYGPDEOAFIWRV3KEKZ nextcloud > /home/steven/backup/DB/backup-nextcloud-noname.sql
+echo "|----------> 2.2 Step - Optional: Dump all Databases - Monica:"
+sudo docker exec Monica-db /usr/bin/mariadb-dump -u root --password=OQTLI95GHQ9Y0QSIKJ2BHITG monica > /home/steven/backup/DB/backup-monica.sql
+echo "|----------> 2.2 Step - Optional: Dump all Databases - Discourse:"
+sudo docker exec Discourse-postgres pg_dumpall -c -U discourse > /home/steven/backup/DB/backup-discourse.sql
+echo "|----------> 2.2 Step - Optional: Dump all Databases - Jellystat:"
+sudo docker exec Jellystat-db pg_dumpall -c -U postgres > /home/steven/backup/DB/backup-jellystat.sql
+echo "|----------> 2.2 Step - Optional: Dump all Databases - Paperless-Research:"
+sudo docker exec Paperless-Research-db pg_dumpall -c -U paperless > /home/steven/backup/DB/backup-paperless-research.sql
+echo "|----------> 2.2 Step - Optional: Dump all Databases - Paperless-Office:"
+sudo docker exec Paperless-Office-db pg_dumpall -c -U paperless > /home/steven/backup/DB/backup-paperless-office.sql
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+echo "|----------> 2.2 Step: Backup DB Dumps with Borg:"
+sudo borg create --stats --progress /BORG/Cosmos/DB::DB-{now} /home/steven/backup/DB
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # STOP ALL CONTAINERS:
-echo "|----------> 2. Step: Stop all running Docker Containers:"
+echo "|----------> 3. Step: Stop all running Docker Containers:"
 sudo docker stop $(docker ps -a -q)
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # BORG BACKUP ALL DATA IN DOCKER VOLUMES PATH:
-echo "|----------> 3.1 Step: Compress all Volumes LZ4 with BORG and save to NAS-MAIN:"
+echo "|----------> 4. Step: Compress all Volumes LZ4 with BORG and save to NAS-MAIN:"
 # NOTE: THIS IS BACKING UP ALL CONTENTS OF THE DOCKER VOLUMES PATH. SO EVERYTHING SHOULD BE INCLUDED WHEN IT COMES TO VOLUMES!
 # TEMPLATE COMMAND - BORG: LZ4 COMPRESSION & STATS & PROGRESS & NON-VERBOSE: borg create --stats --progress /REPOPATH::25-11-2021-NAME /SOURCEPATH
 # TEMPLATE COMMAND - TAR ZSTD: sudo tar -cvf /TARGETPATH-$DATE.tar /SOURCEPATH
 sudo borg create --stats --progress /BORG/Cosmos/Volumes::{now}-Volumes-All /var/lib/docker/volumes
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # BORG BACKUP BIND MOUNT PATHS - Manually:
-echo "|----------> 3.2 Step: Compress all Bind Mounts as LZ4 with BORG and save to NAS-MAIN:"
+echo "|----------> 5. Step: Compress all Bind Mounts as LZ4 with BORG and save to NAS-MAIN:"
 # NOTE: YOU HAVE TO FIND ALL BIND MOUNT PATHS MANUALLY!!! THIS IS NOT AUTOMATED, IN CONTRAST TO VOLUMES! AND ONLY BACKUP WHAT YOU WANT, OTHERWISE YOU IDIOT WILL BACKUP YOUR WHOLE NAS WHEN YOU BIND IT TO PLEX!!
 # TEMPLATE COMMAND: tar -czvf /BACKUP/Bind/ARCHIVENAME FILENAME
 # TEMPLATE COMMAND - BORG: LZ4 COMPRESSION & STATS & PROGRESS & NON-VERBOSE: borg create --stats --progress /REPOPATH::25-11-2021-NAME /SOURCEPATH
@@ -76,46 +102,34 @@ sudo borg create --stats --progress /BORG/Cosmos/Bind::archivebox-data-{now} /ho
 sudo borg create --stats --progress /BORG/Cosmos/Bind::tautulli-{now} /home/steven/docker/bind/tautulli
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # BORG BACKUP BIND MOUNT PATHS - home/steven/docker:
-echo "|----------> 3.3 Step: Compress all Bind Mounts in /home/steven/docker as LZ4 with BORG and save to NAS-MAIN:"
+echo "|----------> 6. Step: Compress all Bind Mounts in /home/steven/docker as LZ4 with BORG and save to NAS-MAIN:"
 sudo borg create --stats --progress /BORG/Cosmos/System::{now}-steven-docker /home/steven/docker
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# OPTIONAL: DUMP DBS:
-echo "|----------> 5. Step - Optional: Dump all Databases:"
-# TEMPLATE COMMAND - MARIA DB: docker exec CONTAINERNAME /usr/bin/mariadb-dump -u root --password=ROOTPASSWORD DATABASE > backup.sql
-# TEMPLATE COMMAND - MYSQL: docker exec CONTAINERNAME /usr/bin/mysqldump -u root --password=ROOTPASSWORD DATABASE > backup.sql
-# TEMPLATE COMMAND - PostgreSQL - All - Uncompressed: docker exec CONTAINERNAME pg_dumpall -c -U POSTGRESUSER > backup.sql 
-# TEMPLATE COMMAND - PostgreSQL - Specific DB - Uncompressed: docker exec CONTAINERNAME pg_dumpall -c -U POSTGRESUSER -d DATABASENAME > backup.sql 
-echo "|----------> 5.1 Step - Optional: Dump all Databases - Nextcloud - Office:"
-#docker exec CONTAINERNAME /usr/bin/mariadb-dump -u root --password=ROOTPASSWORD DATABASE > backup.sql
-echo "|----------> 5.1 Step - Optional: Dump all Databases - Nextcloud - Public:"
-#docker exec CONTAINERNAME /usr/bin/mariadb-dump -u root --password=ROOTPASSWORD DATABASE > backup.sql
-echo "|----------> 5.1 Step - Optional: Dump all Databases - Nextcloud - No Name:"
-#docker exec CONTAINERNAME /usr/bin/mariadb-dump -u root --password=ROOTPASSWORD DATABASE > backup.sql
-echo "|----------> 5.2 Step - Optional: Dump all Databases - Monica:"
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Backup other paths with Borg:
-#echo "|----------> 6.1 Step - Backup other paths with Borg - /etc"
+echo "|----------> 7. Step - Backup other paths with Borg:"
+echo "|----------> 7.1 Step - Backup other paths with Borg - /etc"
 sudo borg create --stats --progress /BORG/Cosmos/System::etc-{now} /etc
 # Backup other paths with Borg:
-echo "|----------> 6.2 Step - Backup other paths with Borg - /home"
+echo "|----------> 7.2 Step - Backup other paths with Borg - /home"
 sudo borg create --stats --progress /BORG/Cosmos/System::home-{now} /home
 # Backup other paths with Borg:
-echo "|----------> 6.3 Step - Backup other paths with Borg - /root"
+echo "|----------> 7.3 Step - Backup other paths with Borg - /root"
 sudo borg create --stats --progress /BORG/Cosmos/System::root-{now} /root
 # Backup other paths with Borg:
-echo "|----------> 6.4 Step - Backup other paths with Borg - /var"
+echo "|----------> 7.4 Step - Backup other paths with Borg - /var"
 sudo borg create --stats --progress /BORG/Cosmos/System::var-{now} /var
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # OPTIONAL: Borg Prune:
-echo "|----------> 7.1 Step: Prune Borg Repos:"
+echo "|----------> 8. Step: Prune Borg Repos:"
 #NOTE: This will delete all but the listed number of backups. With -p=progress --force=force deletion --list=Print summary
 # This will keep all backups in the last 24H, for every last 30 days, 4 weekly, 12 monthly and up to 100 years of yearly backups.. ;)
 sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Bind
 sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Exports
 sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/Volumes
+sudo borg -p prune --keep-within 24H --force --list --keep-daily 30 --keep-weekly 4 --keep-monthly 12 --keep-yearly 100 --stats /BORG/Cosmos/System
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # FREE SPACE WITH BORG COMPACT:
-echo "|----------> 7.2 Step: Compact (Free Disk Space) Borg Repos:"
+echo "|----------> 9. Step: Compact (Free Disk Space) Borg Repos:"
 sudo borg --progress compact /BORG/Cosmos/Bind
 sudo borg --progress compact /BORG/Cosmos/Volumes
 sudo borg --progress compact /BORG/Cosmos/Exports
@@ -131,7 +145,7 @@ sudo borg --progress compact /BORG/Cosmos/System
 # CODE NOT NEEDED RIGHT NOW - END --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # START ALL CONTAINERS:
-echo "|----------> 8. Step: Restart all Containers:"
+echo "|----------> 10. Step: Restart all Containers:"
 sudo docker start $(docker ps -a -q)
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # THE END:
